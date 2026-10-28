@@ -1,0 +1,133 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "e01",
+        "name": "Анна",
+        "address": "Зои Яковлевой, 44",
+        "mode": "walk"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          47.2664731,
+          56.1458246
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "e02",
+        "name": "Максим",
+        "address": "Маршака, 6/1",
+        "mode": "walk"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          47.2626389,
+          56.1289515
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "e03",
+        "name": "Дарья",
+        "address": "Свердлова, 51",
+        "mode": "walk"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          47.2437748,
+          56.1513189
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "e04",
+        "name": "Илья",
+        "address": "Московский проспект, 12",
+        "mode": "walk"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          47.2298557,
+          56.1466217
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "e05",
+        "name": "Елена",
+        "address": "Энгельса, 14",
+        "mode": "walk"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          47.2550112,
+          56.1254546
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "e06",
+        "name": "Тимур",
+        "address": "Ярмарочная, 19к4",
+        "mode": "walk"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          47.2641308,
+          56.134808
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "e07",
+        "name": "Ольга",
+        "address": "Гузовского, 3",
+        "mode": "bike"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          47.1851657,
+          56.142523
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "e08",
+        "name": "Артём",
+        "address": "7-й Мясокомбинатский проезд, 19",
+        "mode": "bike"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          47.2807672,
+          56.1150237
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,80 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "L",
+        "address": "Ленинградская, 36",
+        "role": "основной"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          47.245608,
+          56.137972
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "Y",
+        "address": "Ярославская, 27",
+        "role": "основной"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          47.254061,
+          56.142547
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "M",
+        "address": "Московский проспект, 19к1",
+        "role": "альтернатива"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          47.216466,
+          56.143815
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "S",
+        "address": "Правая набережная Сугутки, 1",
+        "role": "альтернатива"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          47.225324,
+          56.131124
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "G",
+        "address": "Юрия Гагарина, 7",
+        "role": "альтернатива"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          47.2539534,
+          56.1239128
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Выбираем офис · учебный прототип</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css">
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@maplibre/maplibre-gl-leaflet@0.1.4/leaflet-maplibre-gl.js"></script>
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <style>
+    :root { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #172033; background: #f3f6f8; }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body { margin: 0; }
+    header { padding: 14px 20px; background: #12263a; color: white; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    h1 { margin: 0; font-size: 20px; }
+    header p { margin: 3px 0 0; color: #cbd8e2; font-size: 13px; }
+    #progress { background: #e1f2e6; color: #14532d; padding: 8px 12px; border-radius: 999px; font-weight: 700; white-space: nowrap; }
+    .registration { margin: 10px 12px 0; padding: 10px 14px; background: white; border: 1px solid #d9e2e8; border-radius: 10px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+    .registration strong { white-space: nowrap; }
+    .registration form { display: flex; align-items: end; gap: 9px; flex-wrap: wrap; }
+    .registration label { display: grid; gap: 3px; font-size: 12px; color: #405169; }
+    .registration input { width: 155px; height: 32px; padding: 5px 8px; border: 1px solid #a9b8c6; border-radius: 5px; font: inherit; }
+    .registration .token-input { width: 270px; }
+    #issued-token-panel { display: flex; align-items: end; gap: 8px; }
+    #issued-token-panel .token-input { width: min(360px, 42vw); }
+    .registration details { font-size: 13px; }
+    .registration summary { cursor: pointer; color: #2353a3; }
+    .registration details form { margin-top: 8px; }
+    .registration button { height: 32px; padding: 0 12px; border: 0; border-radius: 5px; background: #2353a3; color: white; font-weight: 650; cursor: pointer; }
+    .registration button.secondary { background: #e8edf2; color: #25374c; }
+    #registration-message { margin: 0; color: #a72e2e; font-size: 13px; }
+    #student-info { display: flex; align-items: center; gap: 12px; }
+    main { display: grid; grid-template-columns: minmax(520px, 1.15fr) minmax(520px, 1fr); gap: 12px; padding: 12px; height: calc(100vh - 180px); min-height: 620px; }
+    .card { background: white; border: 1px solid #d9e2e8; border-radius: 12px; box-shadow: 0 2px 8px #13273d10; overflow: hidden; }
+    .map-card { display: grid; grid-template-rows: auto minmax(350px, 1fr) auto; }
+    .map-head { padding: 12px 16px; border-bottom: 1px solid #e3e8ed; }
+    .map-head h2, .api-head h2 { margin: 0 0 5px; font-size: 17px; }
+    .map-head p, .api-head p { margin: 0; color: #58677a; font-size: 13px; line-height: 1.4; }
+    #map { min-height: 350px; }
+    .map-foot { border-top: 1px solid #e3e8ed; padding: 10px 14px; display: grid; gap: 7px; font-size: 13px; }
+    .map-legend { color: #58677a; font-size: 12px; }
+    #zone-list { display: flex; flex-wrap: wrap; gap: 7px 12px; }
+    #zone-list label { white-space: nowrap; cursor: pointer; }
+    #zone-list input { vertical-align: -2px; }
+    #status { color: #405169; }
+    #status.status-success { padding: 10px 12px; border: 1px solid #9bd2af; border-radius: 8px; color: #155f35; background: #eaf8ef; font-size: 15px; font-weight: 700; }
+    #error-toast { position: fixed; z-index: 3000; right: 24px; bottom: 24px; max-width: min(440px, calc(100vw - 32px)); padding: 14px 18px; border-radius: 8px; color: #fff; background: #a72e2e; box-shadow: 0 8px 24px #102a1d40; }
+    #error-toast.success { background: #176b42; }
+    #error-toast[hidden] { display: none; }
+    .api-card { display: grid; grid-template-rows: auto minmax(0, 1fr); }
+    .api-head { padding: 12px 16px; border-bottom: 1px solid #e3e8ed; }
+    .steps { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+    .step { padding: 5px 8px; border-radius: 6px; background: #eef2f6; color: #465668; font-size: 12px; }
+    .step.done { background: #dff3e5; color: #176335; }
+    .step.failed { background: #fde8e8; color: #9c2626; }
+    #swagger-ui { height: 100%; overflow: auto; background: white; }
+    #swagger-ui .swagger-ui .wrapper { padding: 0 12px; }
+    #swagger-ui .swagger-ui .info { margin: 8px 0; }
+    #swagger-ui .swagger-ui .info .title { font-size: 22px; }
+    #swagger-ui .swagger-ui .scheme-container { padding: 8px 0; box-shadow: none; }
+    #swagger-ui .swagger-ui .opblock-tag { padding: 8px 0; }
+    .office-pin { background: #243b53; color: white; width: 26px; height: 26px; border: 2px solid white; border-radius: 50%; text-align: center; line-height: 22px; font-weight: 800; box-shadow: 0 2px 7px #0007; }
+    .employee-map-icon { background: transparent; border: 0; }
+    .employee-avatar-marker { position: relative; width: 48px; height: 64px; background-image: url('/assets/employee-avatars.png'); background-repeat: no-repeat; background-size: 400% 200%; clip-path: path('M 24 3 C 12 3 4 12 4 24 C 4 37 14 46 24 58 C 34 46 44 37 44 24 C 44 12 36 3 24 3 Z'); filter: drop-shadow(0 2px 3px #102a1d55); transform-origin: 50% 90%; transition: transform 140ms ease, filter 140ms ease; }
+    .employee-avatar-marker:hover { transform: translateY(-3px) scale(1.06); filter: drop-shadow(0 4px 5px #102a1d66); }
+    .employee-avatar-marker.is-processed::after { content: '✓'; position: absolute; top: 1px; right: 0; width: 19px; height: 19px; display: grid; place-items: center; border: 2px solid white; border-radius: 50%; color: white; background: #168344; box-shadow: 0 1px 4px #102a1d55; font-size: 12px; font-weight: 800; }
+    @media (max-width: 1100px) { main { grid-template-columns: 1fr; height: auto; } .map-card { min-height: 650px; } .api-card { height: 720px; } }
+    @media (max-width: 600px) { #issued-token-panel { flex-wrap: wrap; } #issued-token-panel .token-input { width: min(360px, calc(100vw - 64px)); } }
+  </style>
+</head>
+<body>
+  <header>
+    <div><h1>Где открыть офис?</h1><p>Учебная история: восемь сотрудников, пять адресов, максимум 30 минут в пути</p></div>
+    <div id="progress">Проверено 0 из 8</div>
+  </header>
+  <section class="registration" aria-label="Регистрация студента">
+    <strong>Студенческая сессия</strong>
+    <form id="registration-form">
+      <label>Фамилия<input name="surname" autocomplete="family-name" maxlength="100" required></label>
+      <label>Имя<input name="first_name" autocomplete="given-name" maxlength="100" required></label>
+      <label>Группа<input name="group_name" autocomplete="off" maxlength="100" required></label>
+      <button type="submit">Получить токен</button>
+    </form>
+    <div id="student-info" hidden><span id="student-name"></span><button id="new-registration" class="secondary" type="button">Новая сессия</button></div>
+    <div id="issued-token-panel" hidden>
+      <label>Сохраните токен на время занятия<input id="issued-token" class="token-input" readonly></label>
+      <button id="copy-token" class="secondary" type="button">Скопировать</button>
+    </div>
+    <details id="restore-token">
+      <summary>У меня уже есть токен</summary>
+      <form id="token-form">
+        <label>Ваш токен<input id="student-token" class="token-input" type="password" autocomplete="off" spellcheck="false"></label>
+        <button type="submit">Подключить</button>
+      </form>
+    </details>
+    <p id="registration-message" role="status"></p>
+  </section>
+  <div id="error-toast" role="alert" aria-live="assertive" hidden></div>
+  <main>
+    <section class="card map-card" aria-label="Карта доступности">
+      <div class="map-head">
+        <h2>Карта доступности</h2>
+        <p>После загрузки CSV сотрудники появятся на карте; каждый успешный запрос добавит его зону и отметку на аватарке.</p>
+      </div>
+      <div id="map"></div>
+      <div class="map-foot">
+        <div id="status">Получите персональный токен или подключите ранее выданный.</div>
+        <div class="map-legend">Аватарка показывает дом сотрудника · ✓ — зона уже построена</div>
+        <div id="zone-list"></div>
+      </div>
+    </section>
+    <section class="card api-card" aria-label="Запросы к API">
+      <div class="api-head">
+        <h2>Запросы и ответы API</h2>
+        <p>Подключённый токен используется в Swagger автоматически. Нажмите <b>Try it out</b> и <b>Execute</b>; ответ остаётся рядом с картой.</p>
+        <div class="steps">
+          <span class="step" id="step-csv">1 · CSV сотрудников</span>
+          <span class="step" id="step-offices">2 · GeoJSON офисов</span>
+          <span class="step" id="step-zones">3 · Восемь зон</span>
+          <span class="step" id="step-decision">4 · Выбор офиса</span>
+          <span class="step" id="step-submit">5 · Отправка работы</span>
+        </div>
+      </div>
+      <div id="swagger-ui"></div>
+    </section>
+  </main>
+  <script>
+    const map = L.map('map', {zoomControl: true}).setView([56.135, 47.242], 13);
+    L.maplibreGL({
+      style: 'https://tiles.openfreemap.org/styles/liberty',
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="https://openfreemap.org/">OpenFreeMap</a>'
+    }).addTo(map);
+    L.control.scale().addTo(map);
+
+    const homesLayer = L.layerGroup().addTo(map);
+    const officesLayer = L.layerGroup().addTo(map);
+    const individualLayer = L.layerGroup().addTo(map);
+    const commonLayer = L.layerGroup().addTo(map);
+    const selectedZones = new Set();
+    const colors = ['#2563eb', '#0891b2', '#7c3aed', '#16a34a', '#ea580c', '#dc2626', '#a21caf', '#4f46e5'];
+    const employeeAvatars = {
+      e01: [0, 0], e02: [33.333, 0], e03: [100, 0], e04: [0, 100],
+      e05: [66.667, 100], e06: [100, 100], e07: [66.667, 0], e08: [33.333, 100]
+    };
+    let activeToken = null;
+    let toastTimer;
+    function showError(message) {
+      const toast = document.getElementById('error-toast');
+      toast.classList.remove('success');
+      toast.textContent = message;
+      toast.hidden = false;
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { toast.hidden = true; }, 5000);
+    }
+    function showSuccess(message) {
+      const toast = document.getElementById('error-toast');
+      toast.classList.add('success');
+      toast.textContent = message;
+      toast.hidden = false;
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { toast.hidden = true; }, 6000);
+    }
+    function apiErrorMessage(response, payload) {
+      if (typeof payload?.detail === 'string') return payload.detail;
+      if (Array.isArray(payload?.detail)) return payload.detail.map(item => item.msg).filter(Boolean).join('; ');
+      return `Запрос не выполнен (HTTP ${response.status}). Проверьте данные и попробуйте ещё раз.`;
+    }
+    const swagger = SwaggerUIBundle({
+      url: '/openapi.json', dom_id: '#swagger-ui', deepLinking: true,
+      persistAuthorization: false, validatorUrl: 'none',
+      presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
+      responseInterceptor: response => {
+        let payload = null;
+        try { payload = JSON.parse(response.body); } catch {}
+        if (response.status >= 400) {
+          showError(apiErrorMessage(response, payload));
+        } else if (payload?.accepted === false) {
+          showError(payload.message || 'Решение пока не принято. Проверьте выбранные офисы.');
+        } else if (payload?.accepted === true) {
+          showSuccess('Решение принято! Остался последний шаг — отправьте работу.');
+        } else if (payload?.result === 'passed') {
+          showSuccess('Работа выполнена и зачтена! Результат сохранён в системе.');
+        } else if (payload?.result === 'not_passed') {
+          showError('Работа отправлена, но пока не зачтена. Исправьте выбор офисов и отправьте её снова.');
+        }
+        return response;
+      },
+      requestInterceptor: request => {
+        if (activeToken && request.url) {
+          const url = new URL(request.url, location.href);
+          if (url.origin === location.origin && url.pathname !== '/auth/register') {
+            request.headers = request.headers || {};
+            request.headers.Authorization = `Bearer ${activeToken}`;
+          }
+        }
+        return request;
+      }
+    });
+    let currentState = null;
+    let lastVersion = null;
+    let refreshing = false;
+
+    function ensureHatchPattern() {
+      const svg = map.getPanes().overlayPane.querySelector('svg');
+      if (!svg || svg.querySelector('#common-zone-hatch')) return;
+      const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+      defs.innerHTML = '<pattern id="common-zone-hatch" patternUnits="userSpaceOnUse" width="9" height="9"><path d="M0 9L9 0" stroke="#15803d" stroke-width="2" opacity="0.7"/></pattern>';
+      svg.prepend(defs);
+    }
+
+    function renderZones(state) {
+      individualLayer.clearLayers();
+      commonLayer.clearLayers();
+      for (const feature of state.zones) {
+        const id = feature.properties.employee_id;
+        if (!selectedZones.has(id)) continue;
+        const index = Object.keys(state.employees.reduce((acc, item) => {
+          acc[item.properties.id] = true; return acc;
+        }, {})).indexOf(id);
+        const color = colors[Math.max(0, index) % colors.length];
+        L.geoJSON(feature, {style: {color, fillColor: color, fillOpacity: 0.12, weight: 2}}).addTo(individualLayer);
+      }
+      if (state.common_zone && state.common_zone.geometry && !state.common_zone.geometry.type.includes('Empty')) {
+        L.geoJSON(state.common_zone, {style: {color: '#166534', weight: 3, fillColor: 'url(#common-zone-hatch)', fillOpacity: 1}}).addTo(commonLayer);
+        ensureHatchPattern();
+      }
+    }
+
+    function render(state) {
+      currentState = state;
+      document.getElementById('registration-form').hidden = state.registered;
+      document.getElementById('student-info').hidden = !state.registered;
+      document.getElementById('restore-token').hidden = state.registered;
+      if (state.student) document.getElementById('student-name').textContent = `${state.student.surname} ${state.student.first_name} · ${state.student.group_name}`;
+      document.getElementById('progress').textContent = `Проверено ${state.processed.length} из ${state.total}`;
+      document.getElementById('step-csv').classList.toggle('done', state.employees_loaded);
+      document.getElementById('step-offices').classList.toggle('done', state.offices_loaded);
+      document.getElementById('step-zones').classList.toggle('done', state.processed.length === state.total);
+      document.getElementById('step-decision').classList.toggle('done', !!state.decision?.accepted);
+      document.getElementById('step-submit').classList.toggle('done', state.submission?.result === 'passed');
+      document.getElementById('step-submit').classList.toggle('failed', state.submission?.result === 'not_passed');
+
+      homesLayer.clearLayers();
+      for (const feature of state.employees) {
+        const p = feature.properties;
+        const [lon, lat] = feature.geometry.coordinates;
+        const [spriteX, spriteY] = employeeAvatars[p.id] || [0, 0];
+        const processed = state.processed.includes(p.id);
+        const icon = L.divIcon({
+          className: 'employee-map-icon',
+          html: `<div class="employee-avatar-marker${processed ? ' is-processed' : ''}" style="background-position:${spriteX}% ${spriteY}%" role="img" aria-label="${p.name}, ${p.mode === 'bike' ? 'велосипед' : 'пешком'}${processed ? ', зона построена' : ''}"></div>`,
+          iconSize: [48, 64], iconAnchor: [24, 58], tooltipAnchor: [0, -54]
+        });
+        const modeLabel = p.mode === 'bike' ? 'велосипед' : 'пешком';
+        const marker = L.marker([lat, lon], {icon}).bindTooltip(`${p.name} · ${modeLabel}`);
+        const details = document.createElement('div');
+        const name = document.createElement('strong');
+        name.textContent = p.name;
+        const address = document.createElement('div');
+        address.textContent = p.address;
+        const mode = document.createElement('div');
+        mode.textContent = `${modeLabel}${processed ? ' · зона построена' : ' · зона ещё не построена'}`;
+        details.append(name, address, mode);
+        marker.bindPopup(details).addTo(homesLayer);
+      }
+      officesLayer.clearLayers();
+      for (const feature of state.offices) {
+        const p = feature.properties;
+        const [lon, lat] = feature.geometry.coordinates;
+        const icon = L.divIcon({className: '', html: `<div class="office-pin">${p.id}</div>`, iconSize: [26, 26], iconAnchor: [13, 13]});
+        L.marker([lat, lon], {icon}).bindTooltip(`${p.id} · ${p.address}`).addTo(officesLayer);
+      }
+
+      const zoneList = document.getElementById('zone-list');
+      zoneList.replaceChildren();
+      if (state.processed.length) {
+        const label = document.createElement('strong');
+        label.textContent = 'Отдельные зоны:';
+        zoneList.append(label);
+      }
+      for (const feature of state.zones) {
+        const id = feature.properties.employee_id;
+        const name = feature.properties.name;
+        const label = document.createElement('label');
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.checked = selectedZones.has(id);
+        input.addEventListener('change', () => {
+          input.checked ? selectedZones.add(id) : selectedZones.delete(id);
+          renderZones(currentState);
+        });
+        label.append(input, document.createTextNode(` ${name}`));
+        zoneList.append(label);
+      }
+      renderZones(state);
+
+      const status = document.getElementById('status');
+      status.classList.toggle('status-success', state.submission?.result === 'passed' || state.decision?.accepted === true);
+      if (!state.registered) status.textContent = 'Получите персональный токен или подключите ранее выданный.';
+      else if (state.submission?.result === 'passed') status.textContent = '✓ Работа выполнена и зачтена. Результат сохранён в системе.';
+      else if (state.submission?.result === 'not_passed') status.textContent = 'Работа отправлена, но пока не зачтена. Исправьте решение и отправьте снова.';
+      else if (state.decision?.accepted) status.textContent = 'Выбор подтверждён. Теперь отправьте работу через POST /submit.';
+      else if (state.decision) status.textContent = 'Проверьте расположение выбранных офисов и отправьте решение ещё раз.';
+      else if (state.processed.length === state.total) status.textContent = 'Общая зона готова. Сравните с ней пять офисов и отправьте выбор через POST /decision.';
+      else if (state.employees_loaded && state.offices_loaded) status.textContent = 'Теперь отправляйте POST /isochrones для каждого сотрудника из CSV.';
+      else status.textContent = 'Начните с GET /employees.csv и GET /offices.geojson в панели API.';
+    }
+
+    async function refreshState() {
+      if (refreshing) return;
+      refreshing = true;
+      try {
+        const response = await fetch('/state', {
+          cache: 'no-store', headers: activeToken ? {Authorization: `Bearer ${activeToken}`} : {}
+        });
+        const state = await response.json();
+        if (state.version !== lastVersion) {
+          lastVersion = state.version;
+          render(state);
+        }
+      } catch (error) {
+        showError('Нет связи с локальным API. Проверьте, запущен ли сервер.');
+      } finally {
+        refreshing = false;
+      }
+    }
+    async function connectToken(token) {
+      const response = await fetch('/me', {headers: {Authorization: `Bearer ${token}`}, cache: 'no-store'});
+      if (!response.ok) throw new Error('Токен недействителен или срок его действия истёк.');
+      activeToken = token;
+      sessionStorage.setItem('officePilotToken', token);
+      swagger.authActions.logout(['BearerAuth']);
+      swagger.preauthorizeApiKey('BearerAuth', token);
+      lastVersion = null;
+      await refreshState();
+    }
+    document.getElementById('registration-form').addEventListener('submit', async event => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const button = form.querySelector('button');
+      const message = document.getElementById('registration-message');
+      button.disabled = true;
+      message.textContent = '';
+      try {
+        const body = Object.fromEntries(new FormData(form));
+        const response = await fetch('/auth/register', {
+          method: 'POST', headers: {'content-type': 'application/json'},
+          body: JSON.stringify(body)
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(typeof result.detail === 'string' ? result.detail : 'Проверьте данные регистрации.');
+        document.getElementById('issued-token').value = result.access_token;
+        document.getElementById('issued-token-panel').hidden = false;
+        document.getElementById('student-token').value = result.access_token;
+        await connectToken(result.access_token);
+      } catch (error) {
+        message.textContent = '';
+        showError(error.message);
+      } finally {
+        button.disabled = false;
+      }
+    });
+    document.getElementById('token-form').addEventListener('submit', async event => {
+      event.preventDefault();
+      const message = document.getElementById('registration-message');
+      const token = document.getElementById('student-token').value.trim();
+      try {
+        if (!token) throw new Error('Введите учебный токен.');
+        await connectToken(token);
+        message.textContent = '';
+      } catch (error) {
+        message.textContent = '';
+        showError(error.message);
+      }
+    });
+    document.getElementById('copy-token').addEventListener('click', async () => {
+      const field = document.getElementById('issued-token');
+      try {
+        await navigator.clipboard.writeText(field.value);
+      } catch {
+        field.select();
+        showError('Не удалось скопировать автоматически. Выделите токен и скопируйте его вручную.');
+      }
+    });
+    document.getElementById('new-registration').addEventListener('click', () => {
+      document.getElementById('student-info').hidden = true;
+      document.getElementById('registration-form').hidden = false;
+      document.getElementById('registration-message').textContent = 'Повторная регистрация создаст новую отдельную сессию.';
+    });
+    const rememberedToken = sessionStorage.getItem('officePilotToken');
+    if (rememberedToken) {
+      connectToken(rememberedToken).catch(() => {
+        sessionStorage.removeItem('officePilotToken');
+        activeToken = null;
+        refreshState();
+      });
+    } else {
+      refreshState();
+    }
+    setInterval(refreshState, 1100);
+  </script>
+</body>
+</html>
