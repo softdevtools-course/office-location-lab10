@@ -132,6 +132,7 @@ def main():
 <script src="https://cdn.jsdelivr.net/npm/@maplibre/maplibre-gl-leaflet@0.1.4/leaflet-maplibre-gl.js"></script>
 """
     layer = f"""<script>
+    {map_.get_name()}.attributionControl.setPrefix(false);
     const overlaySvg = {map_.get_name()}.getPanes().overlayPane.querySelector('svg');
     if (overlaySvg) {{
       const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
