@@ -175,6 +175,9 @@
       url: '/openapi.json', dom_id: '#swagger-ui', deepLinking: true,
       persistAuthorization: false, validatorUrl: 'none',
       presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
+      onComplete: () => {
+        if (activeToken) swagger.preauthorizeApiKey('BearerAuth', activeToken);
+      },
       responseInterceptor: response => {
         let payload = null;
         try { payload = JSON.parse(response.body); } catch {}
@@ -335,7 +338,6 @@
       if (!response.ok) throw new Error('Токен недействителен или срок его действия истёк.');
       activeToken = token;
       sessionStorage.setItem('officePilotToken', token);
-      swagger.authActions.logout(['BearerAuth']);
       swagger.preauthorizeApiKey('BearerAuth', token);
       lastVersion = null;
       await refreshState();
