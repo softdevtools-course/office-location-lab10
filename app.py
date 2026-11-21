@@ -22,6 +22,7 @@ from uuid import uuid4
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, StringConstraints
@@ -61,8 +62,20 @@ app = FastAPI(
     title="Выбираем офис: CSV, JSON и GeoJSON",
     description="Зарегистрируйтесь, подключите Bearer-токен, получите исходные файлы, запросите восемь зон и отправьте результат.",
     version="0.2.0",
+    docs_url=None,
 )
 app.mount("/assets", StaticFiles(directory=ROOT / "assets"), name="assets")
+
+
+@app.get("/docs", include_in_schema=False)
+def custom_swagger_ui():
+    return get_swagger_ui_html(
+        openapi_url=app.openapi_url,
+        title=f"{app.title} - Swagger UI",
+        swagger_js_url="/assets/vendor/swagger-ui-bundle.js",
+        swagger_css_url="/assets/vendor/swagger-ui.css",
+        swagger_favicon_url="/assets/vendor/favicon.png",
+    )
 
 
 def connect() -> sqlite3.Connection:
