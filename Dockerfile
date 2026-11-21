@@ -3,7 +3,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt && useradd --uid 10010 --create-home lab10
-COPY app.py pg_store.py migrate_sqlite.py workbench.html retry_telegram.py employees.csv employees.geojson offices.geojson zones.geojson common-zone.geojson teacher-matrix.csv ./
+COPY app.py pg_store.py migrate_sqlite.py workbench.html employees.csv employees.geojson offices.geojson zones.geojson common-zone.geojson teacher-matrix.csv ./
 COPY assets ./assets
 USER 10010:10010
 EXPOSE 8000
