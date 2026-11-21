@@ -20,6 +20,9 @@ from urllib import error as urlerror
 from urllib import request as urlrequest
 from uuid import uuid4
 
+import pg_store
+import psycopg
+
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.openapi.docs import get_swagger_ui_html
@@ -79,6 +82,8 @@ def custom_swagger_ui():
 
 
 def connect() -> sqlite3.Connection:
+    if pg_store.DSN:
+        return pg_store.Connection()
     connection = sqlite3.connect(DB_PATH, timeout=10)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
@@ -86,6 +91,9 @@ def connect() -> sqlite3.Connection:
 
 
 def initialize_database() -> None:
+    if pg_store.DSN:
+        pg_store.initialize()
+        return
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with connect() as connection:
         connection.executescript("""
@@ -216,10 +224,13 @@ def record(state: dict, event_type: str, employee_id: str | None = None, detail:
                 state["revision"], state["session_id"],
             ),
         )
+        occurred_at = now_utc().isoformat()
         connection.execute(
             "INSERT INTO events(session_id, occurred_at, event_type, employee_id, detail_json) VALUES (?, ?, ?, ?, ?)",
-            (state["session_id"], now_utc().isoformat(), event_type, employee_id, json.dumps(detail or {}, ensure_ascii=False)),
+            (state["session_id"], occurred_at, event_type, employee_id, json.dumps(detail or {}, ensure_ascii=False)),
         )
+        if pg_store.DSN and event_type in {"employees_csv_read", "offices_geojson_read", "isochrone_requested", "office_decision"}:
+            pg_store.publish(connection, state, "started", occurred_at)
 
 
 def common_zone(processed: list[str]) -> dict | None:
@@ -283,7 +294,7 @@ async def audit_request(request: Request, call_next):
                         round((time.perf_counter() - started) * 1000, 1), now_utc().isoformat(),
                     ),
                 )
-        except sqlite3.Error:
+        except (sqlite3.Error, psycopg.Error):
             # Logging must not replace the student's API response.
             pass
     return response
@@ -491,10 +502,13 @@ def submit_work(state: dict = Depends(authenticated_session)):
             (state["session_id"], submitted_at, json.dumps({"result": result})),
         )
         cursor = connection.execute(
+            "INSERT INTO notifications(session_id, result, text, created_at) VALUES (?, ?, ?, ?) RETURNING notification_id" if pg_store.DSN else
             "INSERT INTO notifications(session_id, result, text, created_at) VALUES (?, ?, ?, ?)",
             (state["session_id"], result, message, submitted_at),
         )
-        notification_id = cursor.lastrowid
+        notification_id = cursor.fetchone()["notification_id"] if pg_store.DSN else cursor.lastrowid
+        if pg_store.DSN and result == "passed":
+            pg_store.publish(connection, state, "submitted", submitted_at)
         state["revision"] += 1
         connection.execute(
             "UPDATE sessions SET revision = ? WHERE session_id = ?",

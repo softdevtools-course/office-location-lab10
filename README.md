@@ -60,3 +60,16 @@ uvicorn app:app --host 127.0.0.1 --port 8011
 Геоданные основаны на [OpenStreetMap](https://www.openstreetmap.org/copyright)
 и [OSMnx](https://osmnx.readthedocs.io/en/stable/). Фоновая карта загружается
 из [OpenFreeMap](https://openfreemap.org/) и требует интернет-соединения.
+
+
+### PostgreSQL и события кабинета
+
+Переменная `OFFICE_PILOT_POSTGRES` включает PostgreSQL вместо SQLite. Стенд
+записывает сессию, результат и события в схему `lab08`. Первое действие и
+подтверждённая сдача записываются в `course_events.events` вместе с результатом.
+`NOTIFY course_events` отправляется после успешного завершения транзакции.
+
+Для разового переноса остановите стенд, сохраните SQLite и выполните
+`python migrate_sqlite.py /путь/office-pilot.sqlite3` с подключённым
+PostgreSQL. Скрипт проверяет пустую целевую базу, переносит все строки одной
+транзакцией и создаёт исторические события. Повторный импорт останавливается.
