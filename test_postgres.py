@@ -33,3 +33,25 @@ try:
 except ValueError:
     pass
 print("SQLite → PostgreSQL: записи, события и повторная миграция проверены.")
+
+from types import SimpleNamespace
+request = SimpleNamespace(state=SimpleNamespace())
+response = app.register(app.RegistrationRequest(surname="Тестова", first_name="Ольга", group_name="23-ИС-11с"), request)
+token = __import__("json").loads(response.body)["access_token"]
+state = app.find_session("Bearer " + token)
+assert state and state["surname"] == "Тестова"
+app.get_employees(state)
+state = app.find_session("Bearer " + token)
+app.get_offices(state)
+state = app.find_session("Bearer " + token)
+state["processed"] = list(app.EMPLOYEES)
+state["decision"] = {"office_ids": sorted(app.VALID_OFFICES), "accepted": True}
+app.record(state, "office_decision")
+result = app.submit_work(state)
+assert result["result"] == "passed"
+assert app.submit_work(state)["submitted_at"] == result["submitted_at"]
+with pg_store.Connection() as db:
+    events = db.execute("SELECT kind FROM course_events.events WHERE attempt_id=? ORDER BY id", (state["session_id"],)).fetchall()
+    assert [x["kind"] for x in events] == ["started", "submitted"]
+    assert db.execute("SELECT count(*) AS n FROM submissions WHERE session_id=?", (state["session_id"],)).fetchone()["n"] == 1
+print("Новая попытка: начало и сдача сохранены, повторная отправка идемпотентна.")
