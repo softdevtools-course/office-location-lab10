@@ -16,9 +16,10 @@ from datetime import datetime, timedelta, timezone
 from functools import reduce
 from pathlib import Path
 from typing import Annotated
-from urllib import error as urlerror
-from urllib import request as urlrequest
 from uuid import uuid4
+
+import pg_store
+import psycopg
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
@@ -32,8 +33,6 @@ from shapely.geometry import mapping, shape
 ROOT = Path(__file__).parent
 DB_PATH = Path(os.environ.get("OFFICE_PILOT_DATABASE", ROOT / ".local" / "office-pilot.sqlite3"))
 SESSION_SECONDS = 24 * 60 * 60
-TELEGRAM_TOKEN = os.environ.get("DELIVERY_LAB_TELEGRAM_TOKEN", "")
-TELEGRAM_CHAT_ID = os.environ.get("DELIVERY_LAB_TELEGRAM_CHAT_ID", "")
 bearer_scheme = HTTPBearer(auto_error=False, scheme_name="BearerAuth")
 
 EMPLOYEES = {
@@ -79,6 +78,8 @@ def custom_swagger_ui():
 
 
 def connect() -> sqlite3.Connection:
+    if pg_store.DSN:
+        return pg_store.Connection()
     connection = sqlite3.connect(DB_PATH, timeout=10)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
@@ -86,6 +87,9 @@ def connect() -> sqlite3.Connection:
 
 
 def initialize_database() -> None:
+    if pg_store.DSN:
+        pg_store.initialize()
+        return
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with connect() as connection:
         connection.executescript("""
@@ -216,10 +220,13 @@ def record(state: dict, event_type: str, employee_id: str | None = None, detail:
                 state["revision"], state["session_id"],
             ),
         )
+        occurred_at = now_utc().isoformat()
         connection.execute(
             "INSERT INTO events(session_id, occurred_at, event_type, employee_id, detail_json) VALUES (?, ?, ?, ?, ?)",
-            (state["session_id"], now_utc().isoformat(), event_type, employee_id, json.dumps(detail or {}, ensure_ascii=False)),
+            (state["session_id"], occurred_at, event_type, employee_id, json.dumps(detail or {}, ensure_ascii=False)),
         )
+        if pg_store.DSN and event_type in {"employees_csv_read", "offices_geojson_read", "isochrone_requested", "office_decision"}:
+            pg_store.publish(connection, state, "started", occurred_at)
 
 
 def common_zone(processed: list[str]) -> dict | None:
@@ -283,7 +290,7 @@ async def audit_request(request: Request, call_next):
                         round((time.perf_counter() - started) * 1000, 1), now_utc().isoformat(),
                     ),
                 )
-        except sqlite3.Error:
+        except (sqlite3.Error, psycopg.Error):
             # Logging must not replace the student's API response.
             pass
     return response
@@ -399,63 +406,6 @@ def submission_for(session_id: str) -> dict | None:
     return dict(row) if row else None
 
 
-def notification_text(state: dict, result: str, submitted_at: str) -> str:
-    label = "Сдана" if result == "passed" else "Не сдана"
-    return (
-        f"{label} лабораторная №10: {state['surname']} {state['first_name']}, "
-        f"группа {state['group_name']}.\n"
-        f"Зоны: {len(state['processed'])}/{len(EMPLOYEES)}; "
-        f"выбор офисов: {'верный' if state['decision'] and state['decision']['accepted'] else 'не подтверждён'}.\n"
-        f"Время: {submitted_at}"
-    )
-
-
-def deliver_notification(notification_id: int) -> str:
-    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
-        return "pending"
-    claim_time = now_utc()
-    stale_claim = (claim_time - timedelta(minutes=2)).isoformat()
-    with connect() as connection:
-        row = connection.execute(
-            "SELECT text, delivery_status FROM notifications WHERE notification_id = ?",
-            (notification_id,),
-        ).fetchone()
-        if row is None or row["delivery_status"] == "sent":
-            return "sent" if row else "missing"
-        claimed = connection.execute(
-            """UPDATE notifications SET claimed_at = ?
-               WHERE notification_id = ? AND delivery_status IN ('pending', 'failed')
-                 AND (claimed_at IS NULL OR claimed_at < ?)""",
-            (claim_time.isoformat(), notification_id, stale_claim),
-        )
-        if claimed.rowcount != 1:
-            return "pending"
-    payload = json.dumps({"chat_id": TELEGRAM_CHAT_ID, "text": row["text"]}).encode("utf-8")
-    endpoint = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    request = urlrequest.Request(endpoint, data=payload, headers={"Content-Type": "application/json"}, method="POST")
-    try:
-        with urlrequest.urlopen(request, timeout=5) as response:
-            result = json.load(response)
-        success = bool(result.get("ok"))
-        error_code = None if success else "telegram_rejected"
-    except urlerror.HTTPError as exc:
-        success = False
-        error_code = f"telegram_http_{exc.code}"
-    except (urlerror.URLError, TimeoutError, OSError, ValueError):
-        success = False
-        error_code = "telegram_network_error"
-    with connect() as connection:
-        connection.execute(
-            """UPDATE notifications SET delivery_status = ?, attempt_count = attempt_count + 1,
-               last_error = ?, claimed_at = NULL, sent_at = ? WHERE notification_id = ?""",
-            (
-                "sent" if success else "failed", error_code,
-                now_utc().isoformat() if success else None, notification_id,
-            ),
-        )
-    return "sent" if success else "failed"
-
-
 @app.post("/submit", summary="5. Отправить работу и получить результат")
 def submit_work(state: dict = Depends(authenticated_session)):
     if len(state["processed"]) < len(EMPLOYEES) or state["decision"] is None:
@@ -469,17 +419,8 @@ def submit_work(state: dict = Depends(authenticated_session)):
     )
     existing = submission_for(state["session_id"])
     if existing and existing["result"] == result:
-        with connect() as connection:
-            last_notification = connection.execute(
-                "SELECT delivery_status FROM notifications WHERE session_id = ? ORDER BY notification_id DESC LIMIT 1",
-                (state["session_id"],),
-            ).fetchone()
-        return {
-            "result": result, "submitted_at": existing["submitted_at"],
-            "notification": last_notification["delivery_status"] if last_notification else "pending",
-        }
+        return {"result": result, "submitted_at": existing["submitted_at"], "notification": "handled_by_cabinet"}
     submitted_at = now_utc().isoformat()
-    message = notification_text(state, result, submitted_at)
     with connect() as connection:
         connection.execute(
             """INSERT INTO submissions(session_id, result, submitted_at) VALUES (?, ?, ?)
@@ -490,18 +431,14 @@ def submit_work(state: dict = Depends(authenticated_session)):
             "INSERT INTO events(session_id, occurred_at, event_type, detail_json) VALUES (?, ?, 'work_submitted', ?)",
             (state["session_id"], submitted_at, json.dumps({"result": result})),
         )
-        cursor = connection.execute(
-            "INSERT INTO notifications(session_id, result, text, created_at) VALUES (?, ?, ?, ?)",
-            (state["session_id"], result, message, submitted_at),
-        )
-        notification_id = cursor.lastrowid
+        if pg_store.DSN and result == "passed":
+            pg_store.publish(connection, state, "submitted", submitted_at)
         state["revision"] += 1
         connection.execute(
             "UPDATE sessions SET revision = ? WHERE session_id = ?",
             (state["revision"], state["session_id"]),
         )
-    delivery = deliver_notification(notification_id)
-    return {"result": result, "submitted_at": submitted_at, "notification": delivery}
+    return {"result": result, "submitted_at": submitted_at, "notification": "handled_by_cabinet"}
 
 
 @app.get("/state", include_in_schema=False)
